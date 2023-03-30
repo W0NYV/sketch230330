@@ -1,0 +1,58 @@
+#pragma kernel Init
+#pragma kernel Update
+
+RWTexture2D<float2> _CardinalityTexture;
+
+int _Width;
+int _Height;
+
+float _Du;
+float _Dv;
+float _f;
+float _k;
+
+[numthreads(8,8,1)]
+void Init(uint3 id : SV_DispatchThreadID)
+{
+    int squareSize = 10;
+
+    //真ん中に四角を描く
+    if(_Width / 2 - squareSize / 2 < id.x && id.x < _Width / 2 + squareSize / 2 && _Height / 2 - squareSize / 2 < id.y && id.y < _Height / 2 + squareSize / 2)
+    {
+        _CardinalityTexture[id.xy] = float2(0.5, 0.25);
+    }
+    else
+    {
+        _CardinalityTexture[id.xy] = float2(1, 0);
+    }
+}
+
+[numthreads(8,8,1)]
+void Update(uint3 id : SV_DispatchThreadID)
+{
+
+    float u = _CardinalityTexture[id.xy].x;
+    float v = _CardinalityTexture[id.xy].y;
+    
+    //ラプラシアン
+    float2 laplacian =
+        _CardinalityTexture[id.xy + uint2(-1, 0)] +
+        _CardinalityTexture[id.xy + uint2(1, 0)] +
+        _CardinalityTexture[id.xy + uint2(0, -1)] +
+        _CardinalityTexture[id.xy + uint2(0, 1)] -
+        4 * _CardinalityTexture[id.xy];
+    
+    float dx = 0.01;
+    laplacian /= (dx * dx);
+
+    float du_lap = _Du * laplacian.x;
+    float dv_lap = _Dv * laplacian.y;
+
+    float partial_u = du_lap - u * v * v + _f * (1.0 - u);
+    float partial_v = dv_lap + u * v * v - v * (_f + _k);
+
+    u += partial_u;
+    v += partial_v;
+    
+    _CardinalityTexture[id.xy] = float2(u, v);
+}
